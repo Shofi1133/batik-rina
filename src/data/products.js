@@ -104,7 +104,7 @@ export const heroEyebrow = 'KEINDAHAN YANG SELALU RELEVAN'
 export const promotionalCopy = 'Satu motif, banyak cara untuk bersinar.'
 export const promotionalDescription = 'Temukan batik yang menemani momen istimewa maupun hari-hari sederhana Anda.'
 
-export const whatsappNumber = ''
+export const whatsappNumber = '6285181686626'
 export const instagramUrl = 'https://www.instagram.com/'
 export const whatsappContactNote = 'Nomor WhatsApp bisnis belum diatur. Pesan akan terbuka di WhatsApp agar Anda dapat memilih kontak Batik Rina.'
 export const instagramAccountNote = 'Ganti tautan Instagram dengan akun resmi Batik Rina sebelum dipublikasikan.'
