@@ -24,8 +24,10 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (!supabase) { setLoading(false); return undefined }
-    supabase.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession))
+  const sessionRequest = supabase.auth.getSession()
+  const timeout = new Promise((resolve) => setTimeout(() => resolve({ data: { session: null } }), 5000))
+  Promise.race([sessionRequest, timeout]).then(({ data }) => { setSession(data.session); setLoading(false) })
+  const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => { setSession(nextSession); setLoading(false) })
     return () => listener.subscription.unsubscribe()
   }, [])
 
