@@ -70,6 +70,7 @@ function Header() {
             <a className="mobile-contact-link" href="#contact" onClick={() => setMenuOpen(false)}>Hubungi kami</a>
           </nav>
           <div className="header-actions">
+            <a className="admin-access-link" href="/admin">Admin</a>
             <a className="header-whatsapp" href={generalWhatsAppUrl} target="_blank" rel="noreferrer">Pesan via WhatsApp <ArrowRight aria-hidden="true" /></a>
             <button className="icon-button menu-toggle" type="button" aria-label={menuOpen ? 'Tutup menu navigasi' : 'Buka menu navigasi'} aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}>
               {menuOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
