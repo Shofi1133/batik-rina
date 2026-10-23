@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { supabase } from './lib/supabase'
 import {
   ArrowDown,
   ArrowRight,
@@ -29,7 +30,7 @@ import {
   instagramUrl,
   orderWhatsAppUrl,
   productSortOptions,
-  products,
+  products as legacyProducts,
   productImages,
   promotionalCopy,
   promotionalDescription,
@@ -256,9 +257,17 @@ export default function App() {
   const [category, setCategory] = useState('Semua')
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState('featured')
-  const matchingProducts = useMemo(() => sortProducts(filterProducts(products, query, category), sort), [category, query, sort])
-  const featured = products.slice(0, 4)
-  const latest = products.filter((product) => product.isNew).slice(0, 3)
+  const [remoteProducts, setRemoteProducts] = useState([])
+  useEffect(() => {
+    if (!supabase) return
+    supabase.from('products').select('*').eq('is_published', true).order('created_at', { ascending: false }).then(({ data }) => {
+      if (data?.length) setRemoteProducts(data.map((product) => ({ ...product, image: product.photo, alt: product.description || product.name, colors: product.colors || ['Navy'], sizes: product.sizes || ['S', 'M', 'L', 'XL'], collection: 'Katalog toko', motif: product.motif || 'Batik', isNew: true })))
+    })
+  }, [])
+  const catalogProducts = remoteProducts.length ? remoteProducts : legacyProducts
+  const matchingProducts = useMemo(() => sortProducts(filterProducts(catalogProducts, query, category), sort), [catalogProducts, category, query, sort])
+  const featured = catalogProducts.slice(0, 4)
+  const latest = catalogProducts.filter((product) => product.isNew).slice(0, 3)
 
   const chooseCategory = (value) => {
     setCategory(value)
