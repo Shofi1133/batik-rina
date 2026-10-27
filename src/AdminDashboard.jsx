@@ -61,7 +61,7 @@ export default function AdminDashboard() {
 
   async function authenticate(event) {
     event.preventDefault(); setMessage('')
-    if (!supabase) return setMessage('Supabase belum terkonfigurasi.')
+    if (!supabase) return setMessage('Supabase belum terkonfigurasi. Pastikan VITE_SUPABASE_URL dan VITE_SUPABASE_PUBLISHABLE_KEY tersedia di deployment ini.')
     const result = authMode === 'login' ? await supabase.auth.signInWithPassword({ email, password }) : await supabase.auth.signUp({ email, password })
     if (result.error) setMessage(friendlyError(result.error))
     else if (authMode === 'signup') setMessage('Akun admin dibuat. Periksa email jika konfirmasi diperlukan, lalu masuk.')
@@ -78,7 +78,7 @@ export default function AdminDashboard() {
   async function saveProduct(event) {
     event.preventDefault()
     setMessage('')
-    if (!supabase) return setMessage('Supabase belum terkonfigurasi pada environment ini.')
+    if (!supabase) return setMessage('Supabase belum terkonfigurasi. Pastikan VITE_SUPABASE_URL dan VITE_SUPABASE_PUBLISHABLE_KEY tersedia di deployment ini.')
     if (!session?.user?.id || !store?.id) return setMessage('Sesi toko belum siap. Muat ulang halaman lalu coba lagi.')
     if (!form.name.trim()) return setMessage('Nama produk wajib diisi.')
     setSaving(true)
