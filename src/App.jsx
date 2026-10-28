@@ -1,4 +1,8 @@
-import { useMemo, useState } from 'react'
+import AdminProducts from './components/AdminProducts'
+import AdminDashboard from './components/AdminDashboard'
+import { useEffect, useMemo, useState } from 'react'
+import AdminLogin from './components/AdminLogin'
+import { getProducts, loginAdmin } from './services/api'
 import {
   ArrowDown,
   ArrowRight,
@@ -251,14 +255,101 @@ function Footer() {
   )
 }
 
-export default function App() {
+
+function AdminLoginPage() {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleLogin(credentials) {
+    setLoading(true)
+    setError('')
+
+    try {
+      const data = await loginAdmin(credentials)
+
+      if (!data.token) {
+        throw new Error('Token tidak ditemukan pada respons login Laravel.')
+      }
+
+      sessionStorage.setItem('admin_token', data.token)
+      window.location.href = '/admin'
+    } catch (err) {
+      setError(err.message || 'Login gagal. Silakan coba lagi.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <AdminLogin
+      onLogin={handleLogin}
+      loading={loading}
+      error={error}
+    />
+  )
+}
+
+function AdminDashboardPage() {
+  function handleLogout() {
+    sessionStorage.removeItem('admin_token')
+    window.location.href = '/admin/login'
+  }
+
+  return <AdminDashboard onLogout={handleLogout} />
+}
+
+function CatalogPage() {
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [category, setCategory] = useState('Semua')
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState('featured')
-  const matchingProducts = useMemo(() => sortProducts(filterProducts(products, query, category), sort), [category, query, sort])
+
+  // Data produk dari Laravel API
+  const [products, setProducts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadProducts() {
+      try {
+        setLoading(true)
+        setError('')
+
+        const data = await getProducts()
+
+        if (isMounted) {
+          setProducts(data)
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err.message || 'Gagal memuat produk.')
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false)
+        }
+      }
+    }
+    
+    
+
+    loadProducts()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const matchingProducts = useMemo(
+    () => sortProducts(filterProducts(products, query, category), sort),
+    [products, category, query, sort]
+  )
+
   const featured = products.slice(0, 4)
   const latest = products.filter((product) => product.isNew).slice(0, 3)
+
 
   const chooseCategory = (value) => {
     setCategory(value)
@@ -300,14 +391,79 @@ export default function App() {
             <div className="category-filters" aria-label="Filter kategori">
               {categories.map((item) => <button type="button" key={item} className={category === item ? 'category-filter is-active' : 'category-filter'} aria-pressed={category === item} onClick={() => setCategory(item)}>{item}</button>)}
             </div>
-            <p className="catalog-count" aria-live="polite">{matchingProducts.length} produk</p>
-            <ProductGrid items={matchingProducts} onSelect={setSelectedProduct} emptyText="Belum ada produk yang sesuai. Coba kata kunci atau kategori lain." />
-            <p className="catalog-disclaimer">Catatan katalog: {catalogNote}</p>
+
+            {loading ? (
+              <p className="catalog-count" role="status">
+                Memuat produk...
+              </p>
+            ) : error ? (
+              <p className="catalog-count" role="alert">
+                {error}
+              </p>
+            ) : (
+              <>
+                <p className="catalog-count" aria-live="polite">
+                  {matchingProducts.length} produk
+                </p>
+
+                <ProductGrid
+                  items={matchingProducts}
+                  onSelect={setSelectedProduct}
+                  emptyText="Belum ada produk yang sesuai. Coba kata kunci atau kategori lain."
+                />
+              </>
+            )}
+
+            <p className="catalog-disclaimer">
+              Catatan katalog: {catalogNote}
+            </p>
           </div>
         </section>
       </main>
+
       <Footer />
-      {selectedProduct && <ProductDialog key={selectedProduct.id} product={selectedProduct} onClose={() => setSelectedProduct(null)} />}
+
+      {selectedProduct && (
+        <ProductDialog
+          key={selectedProduct.id}
+          product={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+        />
+      )}
     </>
   )
+}
+
+export default function App() {
+  const currentPath = window.location.pathname
+  const token = sessionStorage.getItem('admin_token')
+
+  if (currentPath === '/admin/login') {
+    if (token) {
+      window.location.replace('/admin')
+      return null
+    }
+
+    return <AdminLoginPage />
+  }
+
+  if (currentPath === '/admin/products') {
+    if (!token) {
+      window.location.replace('/admin/login')
+      return null
+    }
+
+    return <AdminProducts />
+  }
+
+  if (currentPath === '/admin') {
+    if (!token) {
+      window.location.replace('/admin/login')
+      return null
+    }
+
+    return <AdminDashboardPage />
+  }
+
+  return <CatalogPage />
 }
