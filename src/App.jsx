@@ -1,5 +1,8 @@
+import AdminProducts from './components/AdminProducts'
+import AdminDashboard from './components/AdminDashboard'
 import { useEffect, useMemo, useState } from 'react'
-import { supabase } from './lib/supabase'
+import AdminLogin from './components/AdminLogin'
+import { getProducts, loginAdmin } from './services/api'
 import {
   ArrowDown,
   ArrowRight,
@@ -30,7 +33,7 @@ import {
   instagramUrl,
   orderWhatsAppUrl,
   productSortOptions,
-  products as legacyProducts,
+  products,
   productImages,
   promotionalCopy,
   promotionalDescription,
@@ -70,7 +73,6 @@ function Header() {
             <a className="mobile-contact-link" href="#contact" onClick={() => setMenuOpen(false)}>Hubungi kami</a>
           </nav>
           <div className="header-actions">
-            <a className="admin-access-link" href="/admin">Admin</a>
             <a className="header-whatsapp" href={generalWhatsAppUrl} target="_blank" rel="noreferrer">Pesan via WhatsApp <ArrowRight aria-hidden="true" /></a>
             <button className="icon-button menu-toggle" type="button" aria-label={menuOpen ? 'Tutup menu navigasi' : 'Buka menu navigasi'} aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}>
               {menuOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
@@ -253,22 +255,101 @@ function Footer() {
   )
 }
 
-export default function App() {
+
+function AdminLoginPage() {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleLogin(credentials) {
+    setLoading(true)
+    setError('')
+
+    try {
+      const data = await loginAdmin(credentials)
+
+      if (!data.token) {
+        throw new Error('Token tidak ditemukan pada respons login Laravel.')
+      }
+
+      sessionStorage.setItem('admin_token', data.token)
+      window.location.href = '/admin'
+    } catch (err) {
+      setError(err.message || 'Login gagal. Silakan coba lagi.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <AdminLogin
+      onLogin={handleLogin}
+      loading={loading}
+      error={error}
+    />
+  )
+}
+
+function AdminDashboardPage() {
+  function handleLogout() {
+    sessionStorage.removeItem('admin_token')
+    window.location.href = '/admin/login'
+  }
+
+  return <AdminDashboard onLogout={handleLogout} />
+}
+
+function CatalogPage() {
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [category, setCategory] = useState('Semua')
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState('featured')
-  const [remoteProducts, setRemoteProducts] = useState([])
+
+  // Data produk dari Laravel API
+  const [products, setProducts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
   useEffect(() => {
-    if (!supabase) return
-    supabase.from('products').select('id,nama,slug,deskripsi,harga,stok,kategori,gambar_url,aktif,created_at').eq('aktif', true).order('created_at', { ascending: false }).then(({ data }) => {
-      if (data?.length) setRemoteProducts(data.map((product) => ({ ...product, name: product.nama, image: product.gambar_url, description: product.deskripsi, price: product.harga, stock: product.stok, category: product.kategori, alt: product.deskripsi || product.nama, colors: ['Navy'], sizes: ['S', 'M', 'L', 'XL'], collection: 'Katalog toko', motif: 'Batik', isNew: true })))
-    })
+    let isMounted = true
+
+    async function loadProducts() {
+      try {
+        setLoading(true)
+        setError('')
+
+        const data = await getProducts()
+
+        if (isMounted) {
+          setProducts(data)
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err.message || 'Gagal memuat produk.')
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false)
+        }
+      }
+    }
+    
+    
+
+    loadProducts()
+
+    return () => {
+      isMounted = false
+    }
   }, [])
-  const catalogProducts = remoteProducts.length ? remoteProducts : legacyProducts
-  const matchingProducts = useMemo(() => sortProducts(filterProducts(catalogProducts, query, category), sort), [catalogProducts, category, query, sort])
-  const featured = catalogProducts.slice(0, 4)
-  const latest = catalogProducts.filter((product) => product.isNew).slice(0, 3)
+
+  const matchingProducts = useMemo(
+    () => sortProducts(filterProducts(products, query, category), sort),
+    [products, category, query, sort]
+  )
+
+  const featured = products.slice(0, 4)
+  const latest = products.filter((product) => product.isNew).slice(0, 3)
+
 
   const chooseCategory = (value) => {
     setCategory(value)
@@ -310,14 +391,79 @@ export default function App() {
             <div className="category-filters" aria-label="Filter kategori">
               {categories.map((item) => <button type="button" key={item} className={category === item ? 'category-filter is-active' : 'category-filter'} aria-pressed={category === item} onClick={() => setCategory(item)}>{item}</button>)}
             </div>
-            <p className="catalog-count" aria-live="polite">{matchingProducts.length} produk</p>
-            <ProductGrid items={matchingProducts} onSelect={setSelectedProduct} emptyText="Belum ada produk yang sesuai. Coba kata kunci atau kategori lain." />
-            <p className="catalog-disclaimer">Catatan katalog: {catalogNote}</p>
+
+            {loading ? (
+              <p className="catalog-count" role="status">
+                Memuat produk...
+              </p>
+            ) : error ? (
+              <p className="catalog-count" role="alert">
+                {error}
+              </p>
+            ) : (
+              <>
+                <p className="catalog-count" aria-live="polite">
+                  {matchingProducts.length} produk
+                </p>
+
+                <ProductGrid
+                  items={matchingProducts}
+                  onSelect={setSelectedProduct}
+                  emptyText="Belum ada produk yang sesuai. Coba kata kunci atau kategori lain."
+                />
+              </>
+            )}
+
+            <p className="catalog-disclaimer">
+              Catatan katalog: {catalogNote}
+            </p>
           </div>
         </section>
       </main>
+
       <Footer />
-      {selectedProduct && <ProductDialog key={selectedProduct.id} product={selectedProduct} onClose={() => setSelectedProduct(null)} />}
+
+      {selectedProduct && (
+        <ProductDialog
+          key={selectedProduct.id}
+          product={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+        />
+      )}
     </>
   )
+}
+
+export default function App() {
+  const currentPath = window.location.pathname
+  const token = sessionStorage.getItem('admin_token')
+
+  if (currentPath === '/admin/login') {
+    if (token) {
+      window.location.replace('/admin')
+      return null
+    }
+
+    return <AdminLoginPage />
+  }
+
+  if (currentPath === '/admin/products') {
+    if (!token) {
+      window.location.replace('/admin/login')
+      return null
+    }
+
+    return <AdminProducts />
+  }
+
+  if (currentPath === '/admin') {
+    if (!token) {
+      window.location.replace('/admin/login')
+      return null
+    }
+
+    return <AdminDashboardPage />
+  }
+
+  return <CatalogPage />
 }
