@@ -39,8 +39,10 @@ img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .main-nav { display: flex; align-items: center; gap: clamp(20px, 3.1vw, 46px); margin-left: auto; }
 .main-nav a, .header-whatsapp { font-size: 12px; letter-spacing: .025em; transition: color .2s ease; }
 .main-nav a:hover, .header-whatsapp:hover { color: var(--accent); }
-.header-actions { display: flex; align-items: center; gap: 14px; }
-.header-whatsapp { display: inline-flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--brown); padding-bottom: 6px; }
+  .header-actions { display: flex; align-items: center; gap: 14px; }
+  .admin-access-link { font-size: 11px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+  .admin-access-link:hover { color: var(--accent); }
+  .header-whatsapp { display: inline-flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--brown); padding-bottom: 6px; }
 .header-whatsapp svg, .text-link svg, .button svg, .category-tile svg, .footer-contact__link svg { width: 15px; height: 15px; stroke-width: 1.4; }
 .icon-button { display: inline-grid; place-items: center; border: 0; background: transparent; cursor: pointer; }
 .menu-toggle, .mobile-contact-link { display: none; }
