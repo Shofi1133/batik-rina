@@ -261,8 +261,8 @@ export default function App() {
   const [remoteProducts, setRemoteProducts] = useState([])
   useEffect(() => {
     if (!supabase) return
-    supabase.from('products').select('*').eq('is_published', true).order('created_at', { ascending: false }).then(({ data }) => {
-      if (data?.length) setRemoteProducts(data.map((product) => ({ ...product, image: product.photo, alt: product.description || product.name, colors: product.colors || ['Navy'], sizes: product.sizes || ['S', 'M', 'L', 'XL'], collection: 'Katalog toko', motif: product.motif || 'Batik', isNew: true })))
+    supabase.from('products').select('id,nama,slug,deskripsi,harga,stok,kategori,gambar_url,aktif,created_at').eq('aktif', true).order('created_at', { ascending: false }).then(({ data }) => {
+      if (data?.length) setRemoteProducts(data.map((product) => ({ ...product, name: product.nama, image: product.gambar_url, description: product.deskripsi, price: product.harga, stock: product.stok, category: product.kategori, alt: product.deskripsi || product.nama, colors: ['Navy'], sizes: ['S', 'M', 'L', 'XL'], collection: 'Katalog toko', motif: 'Batik', isNew: true })))
     })
   }, [])
   const catalogProducts = remoteProducts.length ? remoteProducts : legacyProducts

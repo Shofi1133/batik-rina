@@ -2,115 +2,28 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './lib/supabase'
 import './admin.css'
 
-const emptyForm = { name: '', description: '', photo: '', category: 'Batik Wanita', is_published: true }
+const emptyForm = { nama: '', slug: '', deskripsi: '', harga: '', stok: '', kategori: 'Batik Wanita', gambar_url: '', aktif: true }
 
-function normalizeProduct(row) {
-  return { ...row, image: row.photo, alt: row.description || row.name, colors: row.colors || ['Navy'], sizes: row.sizes || ['S', 'M', 'L', 'XL'], isNew: false, collection: 'Katalog toko', motif: row.motif || 'Batik', material: row.material || 'Kain batik' }
-}
-
-function friendlyError(error) {
-  if (!error) return 'Terjadi kesalahan yang tidak diketahui.'
-  if (error.code === '42501') return 'Anda tidak memiliki izin untuk mengelola produk toko ini.'
-  if (error.code === '23503') return 'Toko pengguna belum tersedia. Silakan keluar lalu masuk kembali.'
-  if (error.code === '23505') return 'Data produk sudah ada.'
-  return error.message || 'Permintaan belum berhasil. Coba lagi.'
-}
+function slugify(value) { return value.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') }
+function normalizeProduct(row) { return { ...row, name: row.nama, description: row.deskripsi, price: row.harga, stock: row.stok, category: row.kategori, image: row.gambar_url, alt: row.deskripsi || row.nama, colors: ['Navy'], sizes: ['S', 'M', 'L', 'XL'], collection: 'Katalog toko', motif: 'Batik', material: 'Kain batik', isNew: false } }
+function friendlyError(error) { if (!error) return 'Terjadi kesalahan yang tidak diketahui.'; if (error.code === '42501') return 'Akses ditolak oleh keamanan Supabase (RLS).'; if (error.code === '23505') return 'Slug produk sudah digunakan. Gunakan nama yang berbeda.'; if (error.code === '23514') return 'Data produk tidak memenuhi aturan tabel Supabase.'; return error.message || 'Permintaan belum berhasil.' }
 
 export default function AdminDashboard() {
-  const [session, setSession] = useState(null)
-  const [store, setStore] = useState(null)
-  const [items, setItems] = useState([])
-  const [form, setForm] = useState(emptyForm)
-  const [editingId, setEditingId] = useState(null)
-  const [query, setQuery] = useState('')
-  const [authMode, setAuthMode] = useState('login')
-  const [email, setEmail] = useState('adminbatikrina@gmail.com')
-  const [password, setPassword] = useState('adminbatikrina123')
-  const [message, setMessage] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [uploading, setUploading] = useState(false)
+  const [session, setSession] = useState(null); const [items, setItems] = useState([]); const [form, setForm] = useState(emptyForm); const [editingId, setEditingId] = useState(null); const [query, setQuery] = useState(''); const [authMode, setAuthMode] = useState('login'); const [email, setEmail] = useState('adminbatikrina@gmail.com'); const [password, setPassword] = useState('adminbatikrina123'); const [message, setMessage] = useState(''); const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [uploading, setUploading] = useState(false)
 
-  useEffect(() => {
-    if (!supabase) { setLoading(false); return undefined }
-    let active = true
-    supabase.auth.getSession().then(({ data }) => { if (active) { setSession(data.session); setLoading(false) } })
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => { setSession(nextSession); setLoading(false) })
-    return () => { active = false; listener.subscription.unsubscribe() }
-  }, [])
+  useEffect(() => { if (!supabase) { setLoading(false); return undefined }; let active = true; supabase.auth.getSession().then(({ data }) => { if (active) { setSession(data.session); setLoading(false) } }); const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => { setSession(nextSession); setLoading(false) }); return () => { active = false; listener.subscription.unsubscribe() } }, [])
+  useEffect(() => { if (!session || !supabase) return undefined; let active = true; supabase.from('products').select('id,nama,slug,deskripsi,harga,stok,kategori,gambar_url,aktif,created_at').order('created_at', { ascending: false }).then(({ data, error }) => { if (active) { setItems((data || []).map(normalizeProduct)); setMessage(error ? friendlyError(error) : ''); setLoading(false) } }); return () => { active = false } }, [session])
+  const visibleItems = useMemo(() => items.filter((item) => `${item.nama} ${item.kategori}`.toLowerCase().includes(query.toLowerCase())), [items, query])
 
-  useEffect(() => {
-    if (!session || !supabase) return undefined
-    let active = true
-    async function load() {
-      setLoading(true); setMessage('')
-      const storeResult = await supabase.from('stores').select('*').eq('owner_id', session.user.id).maybeSingle()
-      let currentStore = storeResult.data
-      if (storeResult.error) { if (active) { setMessage(friendlyError(storeResult.error)); setLoading(false) }; return }
-      if (!currentStore) {
-        const created = await supabase.from('stores').insert({ owner_id: session.user.id, name: 'Toko Batik Rina', whatsapp_number: '6285181686626' }).select().single()
-        if (created.error) { if (active) { setMessage(friendlyError(created.error)); setLoading(false) }; return }
-        currentStore = created.data
-      }
-      const products = await supabase.from('products').select('*').eq('store_id', currentStore.id).order('created_at', { ascending: false })
-      if (active) { setStore(currentStore); setItems((products.data || []).map(normalizeProduct)); setMessage(products.error ? friendlyError(products.error) : ''); setLoading(false) }
-    }
-    load()
-    return () => { active = false }
-  }, [session])
+  async function authenticate(event) { event.preventDefault(); setMessage(''); if (!supabase) return setMessage('Supabase belum terkonfigurasi.'); const result = authMode === 'login' ? await supabase.auth.signInWithPassword({ email, password }) : await supabase.auth.signUp({ email, password }); if (result.error) setMessage(friendlyError(result.error)); else if (authMode === 'signup') setMessage('Akun dibuat. Periksa email konfirmasi jika diminta, lalu masuk.') }
 
-  const visibleItems = useMemo(() => items.filter((item) => `${item.name} ${item.category}`.toLowerCase().includes(query.toLowerCase())), [items, query])
+  async function saveProduct(event) { event.preventDefault(); setMessage(''); if (!supabase) return setMessage('Supabase belum terkonfigurasi.'); if (!session) return setMessage('Sesi login belum siap.'); if (!form.nama.trim()) return setMessage('Nama produk wajib diisi.'); setSaving(true); const payload = { nama: form.nama.trim(), slug: slugify(form.slug || form.nama), deskripsi: form.deskripsi.trim(), harga: Number(form.harga) || 0, stok: Number(form.stok) || 0, kategori: form.kategori, gambar_url: form.gambar_url || null, aktif: form.aktif }; const result = editingId ? await supabase.from('products').update(payload).eq('id', editingId).select('id,nama,slug,deskripsi,harga,stok,kategori,gambar_url,aktif,created_at').single() : await supabase.from('products').insert(payload).select('id,nama,slug,deskripsi,harga,stok,kategori,gambar_url,aktif,created_at').single(); setSaving(false); if (result.error) return setMessage(`Produk gagal disimpan: ${friendlyError(result.error)}`); const saved = normalizeProduct(result.data); setItems((current) => editingId ? current.map((item) => item.id === editingId ? saved : item) : [saved, ...current]); setForm(emptyForm); setEditingId(null); setMessage('Produk berhasil disimpan dan tampil di daftar.') }
 
-  async function authenticate(event) {
-    event.preventDefault(); setMessage('')
-    if (!supabase) return setMessage('Supabase belum terkonfigurasi. Pastikan URL dan publishable key tersedia di deployment.')
-    const result = authMode === 'login' ? await supabase.auth.signInWithPassword({ email, password }) : await supabase.auth.signUp({ email, password })
-    if (result.error) setMessage(friendlyError(result.error))
-    else if (authMode === 'signup') setMessage('Akun admin dibuat. Periksa email konfirmasi jika diminta, lalu masuk.')
-  }
-
-  async function saveStore(event) {
-    event.preventDefault(); if (!store || !supabase) return
-    const whatsapp_number = event.currentTarget.elements.whatsapp_number.value.replace(/\D/g, '')
-    const result = await supabase.from('stores').update({ whatsapp_number }).eq('id', store.id).select().single()
-    setMessage(result.error ? friendlyError(result.error) : 'Nomor WhatsApp toko tersimpan.')
-    if (!result.error) setStore(result.data)
-  }
-
-  async function saveProduct(event) {
-    event.preventDefault(); setMessage('')
-    if (!supabase) return setMessage('Supabase belum terkonfigurasi. Pastikan URL dan publishable key tersedia di deployment.')
-    if (!session?.user?.id || !store?.id) return setMessage('Sesi toko belum siap. Muat ulang halaman lalu coba lagi.')
-    if (!form.name.trim()) return setMessage('Nama produk wajib diisi.')
-    setSaving(true)
-    const payload = { name: form.name.trim(), description: form.description.trim(), photo: form.photo, category: form.category, is_published: form.is_published, store_id: store.id, price: 0, stock: 0 }
-    const result = editingId ? await supabase.from('products').update(payload).eq('id', editingId).eq('store_id', store.id).select().single() : await supabase.from('products').insert(payload).select().single()
-    setSaving(false)
-    if (result.error) return setMessage(`Produk gagal disimpan: ${friendlyError(result.error)}`)
-    const saved = normalizeProduct(result.data)
-    setItems((current) => editingId ? current.map((item) => item.id === editingId ? saved : item) : [saved, ...current])
-    setForm(emptyForm); setEditingId(null); setMessage('Produk berhasil disimpan dan tampil di daftar.')
-  }
-
-  async function removeProduct(id) {
-    if (!supabase || !store || !window.confirm('Hapus produk ini?')) return
-    const result = await supabase.from('products').delete().eq('id', id).eq('store_id', store.id)
-    if (result.error) setMessage(friendlyError(result.error)); else { setItems((current) => current.filter((item) => item.id !== id)); setMessage('Produk dihapus.') }
-  }
-
-  async function uploadPhoto(event) {
-    const file = event.target.files?.[0]
-    if (!file || !store || !supabase) return
-    setUploading(true); setMessage('Mengunggah foto…')
-    const path = `${store.id}/${crypto.randomUUID()}-${file.name.replace(/[^a-z0-9.]/gi, '-')}`
-    const uploaded = await supabase.storage.from('product-images').upload(path, file, { upsert: false })
-    if (uploaded.error) { setUploading(false); return setMessage(`Foto gagal diunggah: ${friendlyError(uploaded.error)}`) }
-    const { data } = supabase.storage.from('product-images').getPublicUrl(path)
-    setForm((current) => ({ ...current, photo: data.publicUrl })); setUploading(false); setMessage('Foto siap digunakan.')
-  }
+  async function removeProduct(id) { if (!supabase || !window.confirm('Hapus produk ini?')) return; const result = await supabase.from('products').delete().eq('id', id); if (result.error) setMessage(friendlyError(result.error)); else { setItems((current) => current.filter((item) => item.id !== id)); setMessage('Produk dihapus.') } }
+  async function uploadPhoto(event) { const file = event.target.files?.[0]; if (!file || !supabase) return; setUploading(true); setMessage('Mengunggah foto…'); const path = `${crypto.randomUUID()}-${file.name.replace(/[^a-z0-9.]/gi, '-')}`; const uploaded = await supabase.storage.from('product-images').upload(path, file, { upsert: false }); if (uploaded.error) { setUploading(false); return setMessage(`Foto gagal diunggah: ${friendlyError(uploaded.error)}`) }; const { data } = supabase.storage.from('product-images').getPublicUrl(path); setForm((current) => ({ ...current, gambar_url: data.publicUrl })); setUploading(false); setMessage('Foto siap digunakan.') }
 
   if (loading) return <div className="admin-page"><p>Memuat dashboard…</p></div>
-  if (!session) return <main className="admin-page admin-auth"><div className="admin-card"><p className="admin-eyebrow">Batik Rina</p><h1>{authMode === 'login' ? 'Masuk ke dashboard' : 'Buat akun admin'}</h1><p className="admin-muted">Area khusus admin. Buat akun admin pertama Anda untuk mengelola produk toko.</p><form onSubmit={authenticate}><label>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></label><label>Password<input type="password" minLength="6" value={password} onChange={(e) => setPassword(e.target.value)} required /></label><button className="admin-button" type="submit">{authMode === 'login' ? 'Masuk' : 'Daftar'}</button></form>{message && <p className="admin-message">{message}</p>}<button className="admin-link" type="button" onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}>{authMode === 'login' ? 'Belum punya akun? Daftar' : 'Sudah punya akun? Masuk'}</button></div></main>
+  if (!session) return <main className="admin-page admin-auth"><div className="admin-card"><p className="admin-eyebrow">Batik Rina</p><h1>{authMode === 'login' ? 'Masuk ke dashboard' : 'Buat akun admin'}</h1><p className="admin-muted">Area khusus admin untuk mengelola produk katalog.</p><form onSubmit={authenticate}><label>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></label><label>Password<input type="password" minLength="6" value={password} onChange={(e) => setPassword(e.target.value)} required /></label><button className="admin-button" type="submit">{authMode === 'login' ? 'Masuk' : 'Daftar'}</button></form>{message && <p className="admin-message">{message}</p>}<button className="admin-link" type="button" onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}>{authMode === 'login' ? 'Belum punya akun? Daftar' : 'Sudah punya akun? Masuk'}</button></div></main>
 
-  return <main className="admin-page"><header className="admin-header"><div><p className="admin-eyebrow">Dashboard produk</p><h1>{store?.name || 'Toko Anda'}</h1></div><button className="admin-link" type="button" onClick={() => supabase.auth.signOut()}>Keluar</button></header><section className="admin-layout"><div><form className="admin-card admin-store-form" onSubmit={saveStore}><h2>Pengaturan toko</h2><label>Nomor WhatsApp<input name="whatsapp_number" defaultValue={store?.whatsapp_number || ''} placeholder="628xxxxxxxxxx" inputMode="numeric" required /></label><button className="admin-button" type="submit">Simpan nomor</button></form><form className="admin-card" onSubmit={saveProduct}><h2>{editingId ? 'Edit produk' : 'Tambah produk'}</h2><label>Nama produk<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></label><label>Kategori<select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}><option>Batik Wanita</option><option>Batik Modern</option><option>Batik Formal</option></select></label><label>Deskripsi<textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label><label>Foto produk<input type="file" accept="image/*" onChange={uploadPhoto} disabled={uploading} /></label>{form.photo && <img className="admin-preview" src={form.photo} alt="Pratinjau produk" />}<label className="admin-check"><input type="checkbox" checked={form.is_published} onChange={(e) => setForm({ ...form, is_published: e.target.checked })} /> Tampilkan di katalog publik</label><div className="admin-actions"><button className="admin-button" type="submit" disabled={saving || uploading}>{saving ? 'Menyimpan…' : editingId ? 'Simpan perubahan' : 'Simpan produk'}</button>{editingId && <button className="admin-link" type="button" onClick={() => { setEditingId(null); setForm(emptyForm); setMessage('') }}>Batal</button>}</div></form>{message && <p className="admin-message">{message}</p>}</div><section className="admin-card"><div className="admin-list-heading"><div><p className="admin-eyebrow">Katalog</p><h2>Produk toko</h2></div><input aria-label="Cari produk" placeholder="Cari produk…" value={query} onChange={(e) => setQuery(e.target.value)} /></div>{visibleItems.length === 0 ? <p className="admin-muted">Belum ada produk. Tambahkan produk pertama Anda.</p> : <div className="admin-product-list">{visibleItems.map((item) => <article className="admin-product-row" key={item.id}>{item.photo ? <img src={item.photo} alt="" /> : <div className="admin-product-placeholder">BR</div>}<div><h3>{item.name}</h3><p>{item.category} · {item.is_published ? 'Tampil publik' : 'Disembunyikan'}</p></div><div className="admin-row-actions"><button className="admin-link" type="button" onClick={() => { setEditingId(item.id); setForm({ name: item.name || '', description: item.description || '', photo: item.photo || '', category: item.category || 'Batik Wanita', is_published: item.is_published !== false }) }}>Edit</button><button className="admin-link admin-danger" type="button" onClick={() => removeProduct(item.id)}>Hapus</button></div></article>)}</div>}</section></section></main>
+  return <main className="admin-page"><header className="admin-header"><div><p className="admin-eyebrow">Dashboard produk</p><h1>Batik Rina</h1></div><button className="admin-link" type="button" onClick={() => supabase.auth.signOut()}>Keluar</button></header><section className="admin-layout"><form className="admin-card" onSubmit={saveProduct}><h2>{editingId ? 'Edit produk' : 'Tambah produk'}</h2><label>Nama produk<input value={form.nama} onChange={(e) => setForm({ ...form, nama: e.target.value, slug: form.slug || slugify(e.target.value) })} required /></label><label>Slug<input value={form.slug} onChange={(e) => setForm({ ...form, slug: slugify(e.target.value) })} required /></label><label>Harga<input type="number" min="0" value={form.harga} onChange={(e) => setForm({ ...form, harga: e.target.value })} /></label><label>Stok<input type="number" min="0" value={form.stok} onChange={(e) => setForm({ ...form, stok: e.target.value })} /></label><label>Kategori<select value={form.kategori} onChange={(e) => setForm({ ...form, kategori: e.target.value })}><option>Batik Wanita</option><option>Batik Modern</option><option>Batik Formal</option></select></label><label>Deskripsi<textarea value={form.deskripsi} onChange={(e) => setForm({ ...form, deskripsi: e.target.value })} /></label><label>Foto produk<input type="file" accept="image/*" onChange={uploadPhoto} disabled={uploading} /></label>{form.gambar_url && <img className="admin-preview" src={form.gambar_url} alt="Pratinjau produk" />}<label className="admin-check"><input type="checkbox" checked={form.aktif} onChange={(e) => setForm({ ...form, aktif: e.target.checked })} /> Tampilkan di katalog publik</label><div className="admin-actions"><button className="admin-button" type="submit" disabled={saving || uploading}>{saving ? 'Menyimpan…' : editingId ? 'Simpan perubahan' : 'Simpan produk'}</button>{editingId && <button className="admin-link" type="button" onClick={() => { setEditingId(null); setForm(emptyForm) }}>Batal</button>}</div></form><section className="admin-card"><div className="admin-list-heading"><div><p className="admin-eyebrow">Katalog</p><h2>Semua produk</h2></div><input aria-label="Cari produk" placeholder="Cari produk…" value={query} onChange={(e) => setQuery(e.target.value)} /></div>{message && <p className="admin-message">{message}</p>}{visibleItems.length === 0 ? <p className="admin-muted">Belum ada produk.</p> : <div className="admin-product-list">{visibleItems.map((item) => <article className="admin-product-row" key={item.id}>{item.gambar_url ? <img src={item.gambar_url} alt="" /> : <div className="admin-product-placeholder">BR</div>}<div><h3>{item.nama}</h3><p>{item.kategori} · {item.aktif ? 'Tampil publik' : 'Disembunyikan'}</p></div><div className="admin-row-actions"><button className="admin-link" type="button" onClick={() => { setEditingId(item.id); setForm({ nama: item.nama || '', slug: item.slug || '', deskripsi: item.deskripsi || '', harga: item.harga || '', stok: item.stok || '', kategori: item.kategori || 'Batik Wanita', gambar_url: item.gambar_url || '', aktif: item.aktif !== false }) }}>Edit</button><button className="admin-link admin-danger" type="button" onClick={() => removeProduct(item.id)}>Hapus</button></div></article>)}</div>}</section></section></main>
 }
