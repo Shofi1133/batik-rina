@@ -2,6 +2,7 @@ import AdminProducts from './components/AdminProducts'
 import AdminDashboard from './components/AdminDashboard'
 import { useEffect, useMemo, useState } from 'react'
 import AdminLogin from './components/AdminLogin'
+import { KATEGORI_FILTER } from './lib/constants.js'
 import { getProducts, loginAdmin } from './services/api'
 import {
   ArrowDown,
@@ -19,7 +20,6 @@ import {
   benefits,
   brandStory,
   catalogNote,
-  categories,
   categoryTiles,
   colors,
   collections,
@@ -304,10 +304,11 @@ function CatalogPage() {
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState('featured')
 
-  // Data produk dari Laravel API
+  // Produk katalog dimuat dari Supabase
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const catalogCategories = useMemo(() => [...KATEGORI_FILTER, 'Koleksi Terbaru'], [])
 
   useEffect(() => {
     let isMounted = true
@@ -389,7 +390,7 @@ function CatalogPage() {
               <label className="sort-field"><span>Urutkan</span><select value={sort} onChange={(event) => setSort(event.target.value)} aria-label="Urutkan produk">{productSortOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select><ChevronDown aria-hidden="true" /></label>
             </div>
             <div className="category-filters" aria-label="Filter kategori">
-              {categories.map((item) => <button type="button" key={item} className={category === item ? 'category-filter is-active' : 'category-filter'} aria-pressed={category === item} onClick={() => setCategory(item)}>{item}</button>)}
+              {catalogCategories.map((item) => <button type="button" key={item} className={category === item ? 'category-filter is-active' : 'category-filter'} aria-pressed={category === item} onClick={() => setCategory(item)}>{item}</button>)}
             </div>
 
             {loading ? (

@@ -4,7 +4,7 @@ import App from './App.jsx'
 import AdminDashboard from './AdminDashboard.jsx'
 import './styles.css'
 
-const Root = window.location.pathname === '/admin' || window.location.pathname.startsWith('/dashboard/products') ? AdminDashboard : App
+const Root = window.location.pathname === '/admin' || window.location.pathname === '/admin/products' || window.location.pathname.startsWith('/dashboard/products') ? AdminDashboard : App
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
