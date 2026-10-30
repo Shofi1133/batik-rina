@@ -2,6 +2,7 @@ import AdminProducts from './components/AdminProducts'
 import AdminDashboard from './components/AdminDashboard'
 import { useEffect, useMemo, useState } from 'react'
 import AdminLogin from './components/AdminLogin'
+import { KATEGORI_FILTER } from './lib/constants.js'
 import { getProducts, loginAdmin } from './services/api'
 import {
   ArrowDown,
@@ -19,7 +20,6 @@ import {
   benefits,
   brandStory,
   catalogNote,
-  categories,
   categoryTiles,
   colors,
   collections,
@@ -308,7 +308,7 @@ function CatalogPage() {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const catalogCategories = useMemo(() => ['Semua', ...Array.from(new Set(products.map((product) => product.category).filter(Boolean)))], [products])
+  const catalogCategories = useMemo(() => [...KATEGORI_FILTER, 'Koleksi Terbaru'], [])
 
   useEffect(() => {
     let isMounted = true

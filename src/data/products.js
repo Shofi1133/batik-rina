@@ -1,4 +1,6 @@
-export const categories = ['Semua', 'Batik Wanita', 'Batik Modern', 'Batik Formal', 'Koleksi Terbaru']
+import { KATEGORI_FILTER } from '../lib/constants.js'
+
+export const categories = [...KATEGORI_FILTER, 'Koleksi Terbaru']
 
 export const productImages = [
   'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/1-l2rIDgRfYXg7cee099jZnbJq0r1oRR.jpg',
@@ -78,6 +80,7 @@ export const collections = [
 
 export const categoryTiles = [
   { label: 'Batik Wanita', image: productImages[4] },
+  { label: 'Batik Pria', image: productImages[10] },
   { label: 'Batik Modern', image: productImages[10] },
   { label: 'Batik Formal', image: productImages[14] },
   { label: 'Koleksi Terbaru', image: productImages[18] },
