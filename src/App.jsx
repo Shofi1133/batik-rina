@@ -304,10 +304,11 @@ function CatalogPage() {
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState('featured')
 
-  // Data produk dari Laravel API
+  // Produk katalog dimuat dari Supabase
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const catalogCategories = useMemo(() => ['Semua', ...Array.from(new Set(products.map((product) => product.category).filter(Boolean)))], [products])
 
   useEffect(() => {
     let isMounted = true
@@ -389,7 +390,7 @@ function CatalogPage() {
               <label className="sort-field"><span>Urutkan</span><select value={sort} onChange={(event) => setSort(event.target.value)} aria-label="Urutkan produk">{productSortOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select><ChevronDown aria-hidden="true" /></label>
             </div>
             <div className="category-filters" aria-label="Filter kategori">
-              {categories.map((item) => <button type="button" key={item} className={category === item ? 'category-filter is-active' : 'category-filter'} aria-pressed={category === item} onClick={() => setCategory(item)}>{item}</button>)}
+              {catalogCategories.map((item) => <button type="button" key={item} className={category === item ? 'category-filter is-active' : 'category-filter'} aria-pressed={category === item} onClick={() => setCategory(item)}>{item}</button>)}
             </div>
 
             {loading ? (
